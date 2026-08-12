@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: defensync
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/defensync?schema=public
+      JWT_SECRET: supersecret
+      FRONTEND_URL: http://localhost:4000
+      PORT: 4000
+      HOST: 0.0.0.0
+    ports:
+      - '4000:4000'
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  db-data:

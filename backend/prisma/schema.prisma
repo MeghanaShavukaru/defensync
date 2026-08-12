@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  BASE_COMMANDER
+  LOGISTICS_OFFICER
+  AUDITOR
+}
+
+enum EquipmentCategory {
+  VEHICLE
+  WEAPON
+  AMMUNITION
+  COMMUNICATION
+  MEDICAL
+  ENGINEERING
+  OTHER
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  IN_TRANSIT
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+  RETIRED
+}
+
+enum PurchaseStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+enum TransferStatus {
+  DRAFT
+  REQUESTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  IN_TRANSIT
+  RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  RETURNED
+  OVERDUE
+  LOST_OR_DAMAGED
+  CANCELLED
+}
+
+enum ExpenditureStatus {
+  CREATED
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  DUE
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+
+enum AuditAction {
+  LOGIN
+  LOGIN_FAILED
+  CREATE_PURCHASE
+  UPDATE_PURCHASE
+  APPROVE_PURCHASE
+  CREATE_TRANSFER
+  APPROVE_TRANSFER
+  REJECT_TRANSFER
+  DISPATCH_TRANSFER
+  COMPLETE_TRANSFER
+  CREATE_ASSIGNMENT
+  RETURN_ASSET
+  CREATE_EXPENDITURE
+  START_MAINTENANCE
+  COMPLETE_MAINTENANCE
+  UPDATE_USER
+  CHANGE_ROLE
+}
+
+model Base {
+  id            String        @id @default(uuid())
+  code          String        @unique
+  name          String
+  location      String
+  description   String?
+  status        String        @default("ACTIVE")
+  commander     User?         @relation("BaseCommander", fields: [commanderId], references: [id])
+  commanderId   String?       @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  users         User[]
+  assets        Asset[]
+  purchases     Purchase[]
+  transfersFrom Transfer[]    @relation("SourceBase")
+  transfersTo   Transfer[]    @relation("DestinationBase")
+  assignments   Assignment[]
+  expenditures  Expenditure[]
+}
+
+model User {
+  id                   String         @id @default(uuid())
+  firstName            String
+  lastName             String
+  email                String         @unique
+  username             String         @unique
+  password             String
+  role                 UserRole
+  active               Boolean        @default(true)
+  base                 Base?          @relation(fields: [baseId], references: [id])
+  baseId               String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  // Relations
+  commandingBase       Base?          @relation("BaseCommander")
+  purchasesCreated     Purchase[]
+  transfersRequested   Transfer[]     @relation("TransferRequestedBy")
+  transfersApproved    Transfer[]     @relation("TransferApprovedBy")
+  assignmentsAssigned  Assignment[]
+  expendituresCreated  Expenditure[]
+  expendituresApproved Expenditure[]  @relation("ExpenditureApprovedBy")
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+}
+
+model EquipmentType {
+  id                  String            @id @default(uuid())
+  name                String
+  code                String            @unique
+  category            EquipmentCategory
+  description         String?
+  unitOfMeasure       String
+  minimumStock        Int               @default(0)
+  criticalStock       Int               @default(0)
+  individuallyTracked Boolean           @default(false)
+  active              Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  assets              Asset[]
+  purchases           Purchase[]
+  expenditures        Expenditure[]
+  transfers           Transfer[]
+}
+
+model Asset {
+  id                 String              @id @default(uuid())
+  assetCode          String              @unique
+  equipmentType      EquipmentType       @relation(fields: [equipmentTypeId], references: [id])
+  equipmentTypeId    String
+  base               Base                @relation(fields: [baseId], references: [id])
+  baseId             String
+  serialNumber       String?
+  quantity           Int                 @default(1)
+  available          Int                 @default(1)
+  assigned           Int                 @default(0)
+  inTransit          Int                 @default(0)
+  maintenance        Int                 @default(0)
+  status             AssetStatus         @default(AVAILABLE)
+  condition          String              @default("GOOD")
+  acquisitionDate    DateTime
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  // Relations
+  assignments        Assignment[]
+  maintenanceRecords MaintenanceRecord[]
+}
+
+model Supplier {
+  id            String     @id @default(uuid())
+  supplierCode  String     @unique
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  status        String     @default("ACTIVE")
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  purchases     Purchase[]
+}
+
+model Purchase {
+  id               String         @id @default(uuid())
+  purchaseNumber   String         @unique
+  base             Base           @relation(fields: [baseId], references: [id])
+  baseId           String
+  equipmentType    EquipmentType  @relation(fields: [equipmentTypeId], references: [id])
+  equipmentTypeId  String
+  quantity         Int
+  unitCost         Float
+  totalCost        Float
+  supplier         Supplier       @relation(fields: [supplierId], references: [id])
+  supplierId       String
+  purchaseDate     DateTime
+  expectedDelivery DateTime?
+  receivedDate     DateTime?
+  referenceNumber  String?
+  notes            String?
+  status           PurchaseStatus @default(DRAFT)
+  createdBy        User           @relation(fields: [createdById], references: [id])
+  createdById      String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model Transfer {
+  id                String         @id @default(uuid())
+  transferNumber    String         @unique
+  sourceBase        Base           @relation("SourceBase", fields: [sourceBaseId], references: [id])
+  sourceBaseId      String
+  destinationBase   Base           @relation("DestinationBase", fields: [destinationBaseId], references: [id])
+  destinationBaseId String
+  equipmentType     EquipmentType  @relation(fields: [equipmentTypeId], references: [id])
+  equipmentTypeId   String
+  quantity          Int
+  reason            String
+  priority          String
+  requestedBy       User           @relation("TransferRequestedBy", fields: [requestedById], references: [id])
+  requestedById     String
+  requestedAt       DateTime       @default(now())
+  approvedBy        User?          @relation("TransferApprovedBy", fields: [approvedById], references: [id])
+  approvedById      String?
+  approvedAt        DateTime?
+  dispatchedAt      DateTime?
+  receivedAt        DateTime?
+  status            TransferStatus @default(DRAFT)
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model Assignment {
+  id               String           @id @default(uuid())
+  assignmentNumber String           @unique
+  asset            Asset            @relation(fields: [assetId], references: [id])
+  assetId          String
+  quantity         Int
+  base             Base             @relation(fields: [baseId], references: [id])
+  baseId           String
+  assigneeName     String
+  unit             String
+  purpose          String
+  assignedDate     DateTime
+  expectedReturn   DateTime
+  actualReturn     DateTime?
+  assignedBy       User             @relation(fields: [assignedById], references: [id])
+  assignedById     String
+  status           AssignmentStatus @default(ACTIVE)
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model Expenditure {
+  id                String        @id @default(uuid())
+  expenditureNumber String        @unique
+  base              Base          @relation(fields: [baseId], references: [id])
+  baseId            String
+  equipmentType     EquipmentType @relation(fields: [equipmentTypeId], references: [id])
+  equipmentTypeId   String
+  quantity          Int
+  category          String
+  activityReference String?
+  expenditureDate   DateTime
+  approvedBy        User?         @relation("ExpenditureApprovedBy", fields: [approvedById], references: [id])
+  approvedById      String?
+  createdBy         User          @relation(fields: [createdById], references: [id])
+  createdById       String
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model MaintenanceRecord {
+  id                 String            @id @default(uuid())
+  maintenanceId      String            @unique
+  asset              Asset             @relation(fields: [assetId], references: [id])
+  assetId            String
+  maintenanceType    String
+  issue              String
+  description        String?
+  technician         String?
+  startDate          DateTime
+  expectedCompletion DateTime
+  completedDate      DateTime?
+  cost               Float?
+  partsNotes         String?
+  nextServiceDate    DateTime?
+  status             MaintenanceStatus @default(SCHEDULED)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+model Notification {
+  id            String             @id @default(uuid())
+  user          User               @relation(fields: [userId], references: [id])
+  userId        String
+  type          String
+  message       String
+  relatedEntity String?
+  relatedId     String?
+  status        NotificationStatus @default(UNREAD)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model AuditLog {
+  id            String      @id @default(uuid())
+  user          User        @relation(fields: [userId], references: [id])
+  userId        String
+  action        AuditAction
+  entityType    String
+  entityId      String?
+  previousValue String?
+  newValue      String?
+  description   String?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+}
