@@ -309,6 +309,7 @@ model MaintenanceRecord {
   cost               Float?
   partsNotes         String?
   nextServiceDate    DateTime?
+  notes              String?
   status             MaintenanceStatus @default(SCHEDULED)
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
