@@ -19,9 +19,10 @@ FROM node:20-slim AS runtime
 WORKDIR /app
 COPY --from=backend-build /app/backend/dist ./backend/dist
 COPY --from=backend-build /app/backend/node_modules ./backend/node_modules
+COPY --from=backend-build /app/backend/prisma ./backend/prisma
 COPY --from=backend-build /app/frontend/dist ./frontend/dist
 COPY backend/package*.json ./backend/
 EXPOSE 4000
 ENV NODE_ENV=production
 WORKDIR /app/backend
-CMD ["node", "dist/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
