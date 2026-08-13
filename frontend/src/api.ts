@@ -7,7 +7,10 @@ export type ApiResponse<T> = {
   errors?: unknown[];
 };
 
-const baseURL = import.meta.env.VITE_API_URL ?? '/api';
+const configuredBaseUrl = import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_BASE_URL;
+const baseURL = configuredBaseUrl
+  ? `${configuredBaseUrl.replace(/\/$/, '')}${configuredBaseUrl.endsWith('/api') ? '' : '/api'}`
+  : '/api';
 
 const api = axios.create({
   baseURL,

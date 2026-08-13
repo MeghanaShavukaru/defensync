@@ -8,7 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 
 const loginSchema = object({
   email: string().email('Please enter a valid email'),
-  password: string().min(6, 'Password must be at least 6 characters'),
+  password: string().min(1, 'Please enter a password'),
 });
 
 type LoginForm = {
@@ -47,8 +47,21 @@ const LoginPage = () => {
       setUser(response.data.data.user);
       setErrorMessage(null);
       navigate('/', { replace: true });
-    } catch (error: any) {
-      setErrorMessage(error?.response?.data?.message || 'Login failed');
+    } catch (error: unknown) {
+      const apiError = error as {
+        response?: { status: number; data?: { message?: string } };
+        request?: unknown;
+      };
+      if (apiError?.response || apiError?.request) {
+        setErrorMessage(
+          apiError.response?.data?.message ||
+            (apiError.response
+              ? `Login failed (server returned ${apiError.response.status})`
+              : 'Cannot reach the login server. Check the API URL or try again shortly.'),
+        );
+      } else {
+        setErrorMessage('Login failed. Please try again.');
+      }
     }
   };
 

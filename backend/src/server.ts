@@ -21,7 +21,7 @@ app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-const allowedOrigins = [
+const configuredOrigins = [
   process.env.FRONTEND_URL,
   process.env.BACKEND_URL,
   'http://127.0.0.1:5174',
@@ -31,6 +31,17 @@ const allowedOrigins = [
   'http://127.0.0.1:4000',
   'http://localhost:4000',
 ].filter(Boolean) as string[];
+
+// Accept configuration values with an accidental path (for example `/login`).
+// The browser's Origin header always contains only scheme, host, and port.
+const allowedOrigins = configuredOrigins.map((value) => {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value.replace(/\/$/, '');
+  }
+});
+
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 app.use(rateLimit({
